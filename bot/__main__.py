@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
+from .blocklist import Blocklist
 from .db import Quota
 from .handlers import router
 
@@ -40,6 +41,11 @@ async def main():
     dp["quota"] = Quota(os.environ.get("DB_PATH", ROOT / "data" / "labbot.db"),
                         limit=int(os.environ.get("LAB_LIMIT", "2")))
     dp["admins"] = {int(x) for x in os.environ.get("ADMIN_IDS", "").replace(",", " ").split()}
+    blocked = os.environ.get("BLOCKED_USERNAMES", "").replace(",", " ").split()
+    if blocked:
+        bl = Blocklist(blocked, os.environ.get("BLOCK_MSG", "Доступ к боту закрыт."))
+        dp.message.outer_middleware(bl)
+        dp.callback_query.outer_middleware(bl)
     dp.include_router(router)
     await bot.set_my_commands([
         BotCommand(command="new", description="Создать лабу"),
