@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from labgen.registry import LABS
+from .db import Quota
 from .keyboards import confirm_kb, labs_kb, skip_kb, start_kb
 from .states import Form
 
@@ -52,15 +53,21 @@ def summary(data):
 
 
 # ------------------------------------------------------------------ команды
+async def quota_line(user_id, quota: Quota, admins):
+    if user_id in admins:
+        return ""
+    return f"\n\nДоступно лаб: {await asyncio.to_thread(quota.left, user_id)} из {quota.limit}."
+
+
 @router.message(CommandStart())
-async def cmd_start(msg: Message, state: FSMContext):
+async def cmd_start(msg: Message, state: FSMContext, quota: Quota, admins: set):
     await state.clear()
-    await msg.answer("Привет! " + HELP, reply_markup=start_kb())
+    await msg.answer("Привет! " + HELP + await quota_line(msg.from_user.id, quota, admins), reply_markup=start_kb())
 
 
 @router.message(Command("help"))
-async def cmd_help(msg: Message):
-    await msg.answer(HELP, reply_markup=start_kb())
+async def cmd_help(msg: Message, quota: Quota, admins: set):
+    await msg.answer(HELP + await quota_line(msg.from_user.id, quota, admins), reply_markup=start_kb())
 
 
 @router.message(Command("cancel"))
@@ -69,18 +76,27 @@ async def cmd_cancel(msg: Message, state: FSMContext):
     await msg.answer("Отменено. Чтобы начать заново – /new.", reply_markup=start_kb())
 
 
-@router.message(Command("new"))
-async def cmd_new(msg: Message, state: FSMContext):
+LIMIT_MSG = "Лимит исчерпан: вы уже получили {limit} лабы. Больше сгенерировать нельзя."
+
+
+async def begin(msg: Message, state: FSMContext, user_id, quota: Quota, admins):
+    """Начало анкеты – только если лимит лаб не исчерпан (чтобы не заполнять её зря)."""
     await state.clear()
+    if user_id not in admins and await asyncio.to_thread(quota.left, user_id) == 0:
+        await msg.answer(LIMIT_MSG.format(limit=quota.limit))
+        return
     await state.set_state(Form.lab)
     await msg.answer("Выберите лабораторную работу:", reply_markup=labs_kb())
 
 
+@router.message(Command("new"))
+async def cmd_new(msg: Message, state: FSMContext, quota: Quota, admins: set):
+    await begin(msg, state, msg.from_user.id, quota, admins)
+
+
 @router.callback_query(F.data == "new")
-async def cb_new(cb: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await state.set_state(Form.lab)
-    await cb.message.answer("Выберите лабораторную работу:", reply_markup=labs_kb())
+async def cb_new(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: set):
+    await begin(cb.message, state, cb.from_user.id, quota, admins)
     await cb.answer()
 
 
@@ -201,10 +217,17 @@ async def step_manual(msg: Message, state: FSMContext):
 
 # ------------------------------------------------------------------ генерация
 @router.callback_query(Form.confirm, F.data == "gen")
-async def cb_generate(cb: CallbackQuery, state: FSMContext):
+async def cb_generate(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: set):
+    await state.set_state(Form.generating)      # повторное нажатие «Сгенерировать» сюда уже не попадёт
     data = await state.get_data()
     lab = lab_of(data)
+    user = cb.from_user
     await cb.answer()
+    rec = await asyncio.to_thread(quota.reserve, user.id, user.username, data, user.id in admins)
+    if rec is None:
+        await state.clear()
+        await cb.message.answer(LIMIT_MSG.format(limit=quota.limit))
+        return
     wait = await cb.message.answer("⏳ Собираю программы и отчёт…")
     try:
         async with GEN_LIMIT:
@@ -212,7 +235,10 @@ async def cb_generate(cb: CallbackQuery, state: FSMContext):
                                             data.get("teacher", ""), data["variant"], tuple(data["nums"]))
     except Exception:
         log.exception("ошибка генерации: %s", data)
-        await wait.edit_text("❌ Не удалось сгенерировать лабу. Попробуйте ещё раз или сообщите автору бота.")
+        await asyncio.to_thread(quota.release, rec)
+        await state.set_state(Form.confirm)
+        await wait.edit_text("❌ Не удалось сгенерировать лабу (лимит не потрачен). Попробуйте ещё раз "
+                             "или сообщите автору бота.", reply_markup=confirm_kb())
         return
     for name, content in files:
         await cb.message.answer_document(BufferedInputFile(content, filename=name))
@@ -221,7 +247,14 @@ async def cb_generate(cb: CallbackQuery, state: FSMContext):
         "В Word при открытии отчёта согласитесь обновить поля – номера страниц в содержании станут точными.",
     )
     await state.clear()
-    await cb.message.answer("Создать ещё одну лабу?", reply_markup=start_kb())
+    if user.id in admins:
+        await cb.message.answer("Создать ещё одну лабу?", reply_markup=start_kb())
+        return
+    left = await asyncio.to_thread(quota.left, user.id)
+    if left:
+        await cb.message.answer(f"Можно сгенерировать ещё лаб: {left}.", reply_markup=start_kb())
+    else:
+        await cb.message.answer(f"Это была последняя лаба из {quota.limit} доступных.")
 
 
 @router.message(F.text)

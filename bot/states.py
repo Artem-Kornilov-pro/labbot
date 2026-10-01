@@ -9,3 +9,4 @@ class Form(StatesGroup):
     variant = State()
     confirm = State()
     manual = State()
+    generating = State()
