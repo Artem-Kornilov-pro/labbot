@@ -8,10 +8,14 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
+from .db import Quota
 from .handlers import router
 
 
-def load_env(path=Path(__file__).resolve().parents[1] / ".env"):
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_env(path=ROOT / ".env"):
     """Минимальный загрузчик .env (KEY=VALUE), не перезаписывает уже заданные переменные."""
     if not path.exists():
         return
@@ -32,6 +36,10 @@ async def main():
         raise SystemExit("Не задан BOT_TOKEN (переменная окружения или файл .env)")
     bot = Bot(token)
     dp = Dispatcher(storage=MemoryStorage())
+    # попадают в обработчики аргументами quota и admins
+    dp["quota"] = Quota(os.environ.get("DB_PATH", ROOT / "data" / "labbot.db"),
+                        limit=int(os.environ.get("LAB_LIMIT", "2")))
+    dp["admins"] = {int(x) for x in os.environ.get("ADMIN_IDS", "").replace(",", " ").split()}
     dp.include_router(router)
     await bot.set_my_commands([
         BotCommand(command="new", description="Создать лабу"),

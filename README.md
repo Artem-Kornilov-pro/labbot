@@ -21,6 +21,14 @@ docker compose logs -f
 ```
 Без Docker: `python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python -m bot`.
 
+## Лимит и база
+Один пользователь может получить не больше `LAB_LIMIT` лаб (по умолчанию 2); `ADMIN_IDS` – Telegram id без лимита.
+Каждая выданная лаба записывается в SQLite (`data/labbot.db`, в Docker – том `labbot-data`): Telegram id,
+@username, ФИО, группа, преподаватель, лаба, вариант, номера заданий, время. Если генерация упала, лимит не тратится.
+```bash
+docker compose exec labbot python -c "import sqlite3; [print(r) for r in sqlite3.connect('data/labbot.db').execute('SELECT * FROM gens')]"
+```
+
 ## Структура
 ```
 bot/                 диалог бота (FSM): лаба → ФИО → группа → преподаватель → вариант → файлы

@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY labgen ./labgen
 COPY bot ./bot
 
-RUN useradd --create-home --uid 1000 botuser
+RUN useradd --create-home --uid 1000 botuser && mkdir /app/data && chown botuser /app/data
 USER botuser
 
 CMD ["python", "-m", "bot"]
