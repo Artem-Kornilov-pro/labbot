@@ -169,11 +169,16 @@ class _Shapes:
               else '<a:ln><a:noFill/></a:ln>')
         font = MONO if mono else FONT
         size = SPEC_SZ - 1 if mono else SPEC_SZ
-        paras = "".join(
-            f'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="{SPEC_LH*20}" w:lineRule="exact"/></w:pPr>'
-            f'<w:r><w:rPr><w:rFonts w:ascii="{font}" w:hAnsi="{font}" w:cs="{font}"/>'
-            f'<w:sz w:val="{size*2}"/><w:szCs w:val="{size*2}"/></w:rPr>'
-            f'<w:t xml:space="preserve">{esc(s)}</w:t></w:r></w:p>' for s in lines)
+        def para(s):
+            # строка – текст или (текст, формула OMML): формула нужна для диапазона с чертой «i = 1,n̄»
+            s, math = s if isinstance(s, tuple) else (s, "")
+            rule = "atLeast" if math else "exact"
+            return (f'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="{SPEC_LH*20}" w:lineRule="{rule}"/>'
+                    f'</w:pPr><w:r><w:rPr><w:rFonts w:ascii="{font}" w:hAnsi="{font}" w:cs="{font}"/>'
+                    f'<w:sz w:val="{size*2}"/><w:szCs w:val="{size*2}"/></w:rPr>'
+                    f'<w:t xml:space="preserve">{esc(s)}</w:t></w:r>'
+                    + (f'<m:oMath>{math}</m:oMath>' if math else "") + '</w:p>')
+        paras = "".join(para(s) for s in lines)
         return (f'<wps:wsp><wps:cNvPr id="{sid}" name="Надпись {sid}"/><wps:cNvSpPr txBox="1"/>'
                 f'<wps:spPr>{self._xfrm(x, y, w, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
                 f'<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>{ln}</wps:spPr>'
@@ -203,15 +208,10 @@ class TitleInfo:
     grade_cols: list = field(default_factory=lambda: ["Итог.\nоценка"])
 
 
-SECTIONS_DEFAULT = ["Задание", "Постановка задачи", "Метод решения задачи", "Внешняя спецификация",
-                    "Описание алгоритма на псевдокоде", "Листинг программы", "Тесты"]
-
-
 class Report:
-    def __init__(self, title: TitleInfo, sections=None):
+    def __init__(self, title: TitleInfo):
         self.t = title
-        self.sections = sections or SECTIONS_DEFAULT
-        self.bm = {name: f"_Toc{1000000 + i:09d}" for i, name in enumerate(self.sections)}
+        self.toc = []                 # (уровень, текст, закладка, раздел, строк раздела до заголовка)
         self._bm_id = 0
         self._shape_id = 1000
         self.doc = Document()
@@ -268,10 +268,12 @@ class Report:
         code.element.rPr.rFonts.set(qn("w:cs"), MONO)
         code.paragraph_format.line_spacing = 1.0
 
-        toc1 = self._get_style("toc 1")
-        toc1.base_style = st
-        toc1.paragraph_format.space_after = Pt(6)
-        toc1.paragraph_format.tab_stops.add_tab_stop(Mm(CONTENT_W_MM), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+        for lvl in (1, 2):
+            toc = self._get_style(f"toc {lvl}")
+            toc.base_style = st
+            toc.paragraph_format.space_after = Pt(6 if lvl == 1 else 3)
+            toc.paragraph_format.left_indent = Cm(0.75 * (lvl - 1))
+            toc.paragraph_format.tab_stops.add_tab_stop(Mm(CONTENT_W_MM), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
         toch = self._get_style("TOC Heading")
         if toch.element.rPr is not None and toch.element.rPr.rFonts is not None:
             for a in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
@@ -351,19 +353,26 @@ class Report:
         self._est(max(1, -(-len(text) // max(chars, 20))) + (before + after) / 16)
         return p
 
-    def heading(self, text):
-        """Заголовок 1-го уровня (с новой страницы) с закладкой для оглавления."""
-        h = self.doc.add_heading(text, level=1)
+    def _toc_heading(self, text, level):
+        """Заголовок с закладкой для оглавления (в оглавлении – уровни 1 и 2, как в образце методички)."""
+        h = self.doc.add_heading(text, level=level)
         self._bm_id += 1
-        h._p.insert(1, X(f'<w:bookmarkStart <NS> w:id="{self._bm_id}" w:name="{self.bm[text]}"/>'))
+        bm = f"_Toc{1000000 + self._bm_id:09d}"
+        h._p.insert(1, X(f'<w:bookmarkStart <NS> w:id="{self._bm_id}" w:name="{bm}"/>'))
         h._p.append(X(f'<w:bookmarkEnd <NS> w:id="{self._bm_id}"/>'))
-        self._cur = text
+        if level == 1:
+            self._cur = text
+        self.toc.append((level, text, bm, self._cur, self.lines_est.get(self._cur, 0)))
         self._est(2)
         return h
 
+    def heading(self, text):
+        """Заголовок 1-го уровня (раздел отчёта, с новой страницы)."""
+        return self._toc_heading(text, 1)
+
     def heading2(self, text):
-        self._est(2)
-        return self.doc.add_heading(text, level=2)
+        """Подзаголовок внутри раздела («Программа 1…»)."""
+        return self._toc_heading(text, 2)
 
     def math_inline(self, p, inner):
         p._p.append(X(f'<m:oMath <NS>>{inner}</m:oMath>'))
@@ -486,23 +495,23 @@ class Report:
     def _toc_xml(self, pages):
         def r_(inner):
             return f"<w:r>{inner}</w:r>"
-        toc_style = self.doc.styles["toc 1"].style_id
+        toc_styles = {lvl: self.doc.styles[f"toc {lvl}"].style_id for lvl in (1, 2)}
         toch_style = self.doc.styles["TOC Heading"].style_id
         entries = []
-        for i, name in enumerate(self.sections):
+        for i, (lvl, name, bm, _, _) in enumerate(self.toc):
             start = ""
             if i == 0:
                 start = (r_('<w:fldChar w:fldCharType="begin"/>')
-                         + r_('<w:instrText xml:space="preserve"> TOC \\o "1-1" \\h \\z \\u </w:instrText>')
+                         + r_('<w:instrText xml:space="preserve"> TOC \\o "1-2" \\h \\z \\u </w:instrText>')
                          + r_('<w:fldChar w:fldCharType="separate"/>'))
             entries.append(
-                f'<w:p><w:pPr><w:pStyle w:val="{toc_style}"/></w:pPr>{start}'
-                f'<w:hyperlink w:anchor="{self.bm[name]}" w:history="1">'
+                f'<w:p><w:pPr><w:pStyle w:val="{toc_styles[lvl]}"/></w:pPr>{start}'
+                f'<w:hyperlink w:anchor="{bm}" w:history="1">'
                 f'{r_(f"<w:t>{esc(name)}</w:t>")}{r_("<w:tab/>")}'
                 + r_('<w:fldChar w:fldCharType="begin"/>')
-                + r_(f'<w:instrText xml:space="preserve"> PAGEREF {self.bm[name]} \\h </w:instrText>')
+                + r_(f'<w:instrText xml:space="preserve"> PAGEREF {bm} \\h </w:instrText>')
                 + r_('<w:fldChar w:fldCharType="separate"/>')
-                + r_(f"<w:t>{pages.get(name, '')}</w:t>")
+                + r_(f"<w:t>{pages.get(bm, '')}</w:t>")
                 + r_('<w:fldChar w:fldCharType="end"/>')
                 + '</w:hyperlink></w:p>')
         return X('<w:sdt <NS>><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/>'
@@ -515,33 +524,47 @@ class Report:
     SPEC_MAX_MM = 225
 
     def spec(self, items):
-        """items: ("box", [строки], скобка_слева) | ("label", текст) | ("rep_start",) | ("rep_end", условие)
-        | ("mono", [строки]) — окно с моноширинным текстом (матрица).
+        """items: ("box", [строки], скобка_слева) | ("label", текст) | ("mono", [строки]) — окно с моноширинным
+        текстом (матрица);
+        ("rep_start",) … ("rep_end", условие) — повторный вывод: скобки с двух сторон, звёздочка, «До <условие>»;
+        ("loop_start", i, a, b) … ("loop_end",) — цикл со счётчиком: «i = a,b̄» сверху, скобки, звёздочка.
         Длинная спецификация делится на несколько групп (группа не переносится между страницами)."""
+        levels = ("rep_start", "loop_start")
+        depth = max_depth = 0
+        for it in items:
+            depth += (it[0] in levels) - (it[0] in ("rep_end", "loop_end"))
+            max_depth = max(max_depth, depth)
         chunk, chunks, depth = [], [], 0
         for i, it in enumerate(items):
-            boundary = depth == 0 and it[0] in ("box", "mono", "label", "rep_start") \
+            boundary = depth == 0 and it[0] in ("box", "mono", "label") + levels \
                 and not (i > 0 and items[i - 1][0] == "label")
-            if boundary and chunk and self._spec_render(chunk + [it], dry=True) > self.SPEC_MAX_MM:
+            if boundary and chunk and self._spec_render(chunk + [it], max_depth, dry=True) > self.SPEC_MAX_MM:
                 chunks.append(chunk)
                 chunk = []
             chunk.append(it)
-            depth += it[0] == "rep_start"
-            depth -= it[0] == "rep_end"
+            depth += (it[0] in levels) - (it[0] in ("rep_end", "loop_end"))
         chunks.append(chunk)
         for ch in chunks:
-            self._spec_render(ch)
+            self._spec_render(ch, max_depth)
 
-    def _spec_render(self, items, dry=False):
+    def _spec_render(self, items, levels=1, dry=False):
+        """levels – наибольшая вложенность циклов во всей спецификации (одинаковая ширина окон во всех группах)."""
         sh = _Shapes(self._shape_id)
         total_w = CONTENT_W_MM / 25.4 * 72
-        X_OUT, BR = 0, 7
-        X_IN = X_OUT + BR + 4
+        BR, GAP, LABEL_H = 7, 6, 20
+        STEP = BR + 4                  # шаг вложенных скобок слева
+        RSTEP = BR + 16                # шаг скобок справа (скобка + звёздочка)
+        X_IN = levels * STEP           # скобка окна, выводимого по условию
         X_BOX = X_IN + BR + 4
-        X_R = total_w - BR - 18
-        X_RBR = X_R + 4
-        GAP, LABEL_H = 6, 20
+        X_R = total_w - max(levels, 1) * RSTEP - 2
         inner_w = X_R - X_BOX - 16
+
+        def close(y0, y1, lvl):
+            x_rbr = X_R + 4 + (levels - 1 - lvl) * RSTEP
+            shapes.append(sh.geom(lvl * STEP, y0, BR, y1 - y0, "leftBrace"))
+            shapes.append(sh.geom(x_rbr, y0, BR, y1 - y0, "rightBrace"))
+            shapes.append(sh.geom(x_rbr + BR + 3, y0 - 2, 9, 9, "star5", fill=True))
+
         shapes, stack, y = [], [], 2
         for it in items:
             kind = it[0]
@@ -560,12 +583,19 @@ class Report:
                 stack.append(y)
             elif kind == "rep_end":
                 y0 = stack.pop()
-                y1 = y - GAP
-                shapes.append(sh.geom(X_OUT, y0, BR, y1 - y0, "leftBrace"))
-                shapes.append(sh.geom(X_RBR, y0, BR, y1 - y0, "rightBrace"))
-                shapes.append(sh.geom(X_RBR + BR + 3, y0 - 2, 9, 9, "star5", fill=True))
+                close(y0, y - GAP, len(stack))
                 shapes.append(sh.text(X_BOX - 5, y, X_R - X_BOX, LABEL_H, [it[1]], border=False))
                 y += LABEL_H + GAP
+            elif kind == "loop_start":
+                stack.append(y)
+                _, var, a, b = it
+                shapes.append(sh.text(X_BOX - 5, y, X_R - X_BOX, LABEL_H + 2, [(f"{var} = ", rng(a, b))],
+                                      border=False))
+                y += LABEL_H + 2
+            elif kind == "loop_end":
+                y0 = stack.pop()
+                close(y0, y - GAP, len(stack))
+                y += GAP
         H = y + 2
         if dry:
             return H / 72 * 25.4
@@ -598,18 +628,17 @@ class Report:
         self._est(len(src.split("\n")) * 0.56)
 
     def tests_table(self, rows):
-        """rows: [(исходные данные: list[str], результат: list[str], случай: str)]."""
-        tbl = self.doc.add_table(rows=1, cols=4)
+        """rows: [(исходные данные: list[str], результат: list[str])] – столбцы как в методичке: №, данные, результат."""
+        tbl = self.doc.add_table(rows=1, cols=3)
         self._table_borders(tbl)
-        widths = [Mm(9), Mm(46), Mm(76), Mm(34)]
-        for c, t in zip(tbl.rows[0].cells, ["№", "Исходные данные", "Результат", "Проверяемый случай"]):
+        widths = [Mm(9), Mm(70), Mm(86)]
+        for c, t in zip(tbl.rows[0].cells, ["№", "Исходные данные", "Результат"]):
             self._cell_text(c, [t], size=12, bold=True, align=C)
-        for i, (inp, res, case) in enumerate(rows, 1):
+        for i, (inp, res) in enumerate(rows, 1):
             cells = tbl.add_row().cells
             self._cell_text(cells[0], [str(i)], size=12, align=C)
             self._cell_text(cells[1], inp, style="Code")
             self._cell_text(cells[2], res, style="Code")
-            self._cell_text(cells[3], [case], size=11)
             self._est(max(len(inp), len(res)) * 0.6 + 0.5)
         self._set_widths(tbl, widths)
         tbl.rows[0]._tr.get_or_add_trPr().append(X('<w:tblHeader <NS>/>'))
@@ -629,13 +658,15 @@ class Report:
 
     # ------------------------------------------------------------ финал
     def _estimate_pages(self):
+        """Приблизительные номера страниц по закладкам (Word уточнит их, обновив поле при открытии)."""
         per_page = 42.0            # строк 14 pt на странице
-        pages, cur = {}, 2         # титульный = 0, содержание = 1
-        for name in self.sections:
-            pages[name] = cur
-            n = self.lines_est.get(name, 1)
-            cur += max(1, -(-int(n) // int(per_page)))
-        return pages
+        start, cur = {}, 2         # титульный = 0, содержание = 1
+        for lvl, name, _, _, _ in self.toc:
+            if lvl == 1:
+                start[name] = cur
+                n = self.lines_est.get(name, 1)
+                cur += max(1, -(-int(n) // int(per_page)))
+        return {bm: start[sec] + int(off // per_page) for _, _, bm, sec, off in self.toc}
 
     def _schema_sort(self, root):
         order = {
