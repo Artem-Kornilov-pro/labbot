@@ -2,6 +2,8 @@
 from ...docx_engine import Report, TitleInfo, J, C
 
 GOAL = ("*ЦЕЛЬ РАБОТЫ:* Алгоритмы с досрочным выходом из цикла. Алгоритмы обработки целых чисел.")
+# вводная фраза части в практикуме (у части II она уже входит в условие: «Дан массив целых положительных чисел.»)
+PREFACE = {1: "Для решения задачи необходимо использовать алгоритмы с досрочным выходом из цикла. ", 2: ""}
 REQ = {
     1: ["1. Необходима проверка допустимости исходных данных.",
         "2. Необходимо использование алгоритмов с досрочным выходом из цикла. При этом используются либо "
@@ -30,13 +32,15 @@ def build_report(author, group, teacher, variant, nums, tasks, year="2026") -> b
              "на количество заданий) + 1:", align=J, after=4)
     rep.para(f"– часть I: ({variant} mod 17) + 1 = {variant % 17 + 1};", indent=1)
     rep.para(f"– часть II: ({variant} mod 10) + 1 = {variant % 10 + 1}.", indent=1, after=10)
-    for t in tasks:
-        rep.para(f"*{_prog_title(t)}.*", before=8, after=4, keep=True)
-        rep.para(t.statement, align=J, indent=0.6, after=4)
-        rep.para("Требования к выполнению:", indent=0.6, after=2)
+    # по методичке: задания – пунктами, текст скопирован из практикума, в конце – что они в разных программах
+    for i, t in enumerate(tasks, 1):
+        rep.para(f"*{i}. Часть {'I' * t.part}, задание {t.num}.* {PREFACE[t.part]}{t.statement}",
+                 align=J, before=8, after=4)
+        rep.para("ТРЕБОВАНИЯ К ВЫПОЛНЕНИЮ РАБОТЫ.", indent=0.6, after=2, keep=True)
         for s in REQ[t.part]:
             rep.para(s, align=J, indent=0.6, after=2)
-    rep.para("*ЗАМЕЧАНИЕ.* Каждую часть оформить как отдельную программу.", before=12)
+    rep.para(f"Задания {', '.join(map(str, range(1, len(tasks))))} и {len(tasks)} выполняются в разных программах.",
+             before=12)
 
     # ---------------------------------------------------------------- Постановка
     rep.heading("Постановка задачи")
@@ -88,7 +92,7 @@ def build_report(author, group, teacher, variant, nums, tasks, year="2026") -> b
         rows, runs = [], []
         for tst in t.tests:
             con = t.run(tst.lines, author)
-            rows.append((tst.shown, con.results, tst.case))
+            rows.append((tst.shown, con.results))
             runs.append(con.transcript)
         rep.tests_table(rows)
         if t.note:
