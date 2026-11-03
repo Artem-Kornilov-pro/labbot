@@ -4,9 +4,10 @@
 (LAB_NO, TITLE, PARTS, tasks_for_variant, task_texts, generate), и добавьте его в LABS.
 Лабы 3–5 собраны на общем каркасе labgen/labs/core (функции all_tasks() – для проверок).
 """
-from .labs import lab2, lab3
+from .labs import lab2, lab3, lab4
 
 LABS = {
     "2": lab2,
     "3": lab3,
+    "4": lab4,
 }
