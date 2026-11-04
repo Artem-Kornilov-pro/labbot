@@ -39,7 +39,7 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     # попадают в обработчики аргументами quota и admins
     dp["quota"] = Quota(os.environ.get("DB_PATH", ROOT / "data" / "labbot.db"),
-                        limit=int(os.environ.get("LAB_LIMIT", "2")))
+                        limit=int(os.environ.get("LAB_LIMIT", "6")))
     dp["admins"] = {int(x) for x in os.environ.get("ADMIN_IDS", "").replace(",", " ").split()}
     blocked = os.environ.get("BLOCKED_USERNAMES", "").replace(",", " ").split()
     if blocked:
