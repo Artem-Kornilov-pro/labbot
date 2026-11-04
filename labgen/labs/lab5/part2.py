@@ -116,7 +116,7 @@ VARIANTS = {
         lambda s: "".join(c for c in s if not (is_dig(c) and int(c) % 2 == 0)), ("edit",),
         "i := 1\n\t_цикл-пока_ i ≤ L(s)\n\t\t_если_ цифра(s[i]) _и_ s[i] чётная _то_\n\t\t\tудалить(s, i)\n"
         "\t\t_иначе_\n\t\t\ti := i + 1\n\t\t_всё_\n\t_кц_",
-        ["i = 1", ["пока  i ≤ L", "удалить(s, i),  если  цифра(s[i])  и  s[i] ⋮ 2", "i = i + 1,  иначе"]]),
+        ["i = 1", ["пока  i ≤ L", "удалить(s, i),  если  цифра(s[i])  и  s[i] mod 2 = 0", "i = i + 1,  иначе"]]),
     4: ("вставить два нуля между каждыми двумя соседними латинскими буквами", '''    int i = 0;
     while (s[i] != '\\0')
         if (is_lat(s[i]) && is_lat(s[i + 1])){
@@ -370,11 +370,15 @@ _кон_
 
     def tests(self):
         def show(name, data):
-            lines = data.decode("utf-8").replace("\r", "␍").split("\n")
+            lines = data.decode("utf-8").split("\n")
             if lines and lines[-1] == "":
                 lines = lines[:-1]
-            return [f"файл {name}:"] + [f"  «{x}»" if len(x) <= 40 else f"  «{x[:12]}…» ({len(x)} символов)"
-                                        for x in lines]
+            out = [f"файл {name}:"]
+            for x in lines:
+                vis = x.replace("\r", "\\r")
+                n = len(x.replace("\r", ""))
+                out.append(f"  «{vis}»" if n <= 40 else f"  «{vis[:12]}…{vis[-3:]}» ({n} симв.)")
+            return out
         f1 = "1c2a3b\nПривет, World 2024!\n  b9a 7 ёж Ёж 100\nlast 12345 zz\n".encode("utf-8")
         f2 = ("1c2a3b0\r\n\r\n" + "x" * (LMAX + 1) + "\r\nЁлка 42 ab").encode("utf-8")
         f3 = "1c2a3b\nHello мир 99\n".encode("utf-8")
@@ -405,8 +409,8 @@ _кон_
                   "текст в кодировке UTF-8 (русская буква – 2 байта), конец строки – '\\n' или '\\r\\n'."],
             svyaz=self.svyaz, method=self.method(), spec=self.spec(), pseudo=self.pseudo(), tests=self.tests(),
             file="lab5_part2.c",
-            note="В таблице тестов «␍» – символ '\\r' (конец строки Windows). Файлы создаются в текущей папке "
-                 "программы.",
+            note="В таблице тестов \\r – символ возврата каретки (конец строки Windows: \\r\\n). Файлы "
+                 "создаются в текущей папке программы.",
         )
 
 

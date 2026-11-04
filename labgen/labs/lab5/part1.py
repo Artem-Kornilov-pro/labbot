@@ -12,12 +12,13 @@ COUNT = 12
 INTRO = "Создать файл для хранения действительных чисел, вводимых с клавиатуры. Прочитать этот файл и вычислить: "
 NMAX = 50
 
-# фильтр: C-условие, Python, текст для «Связи», сообщение «нет чисел»
+# фильтр: C-условие, Python, текст для «Связи», сообщение «нет чисел» («» – подходящие числа есть всегда)
 FILTERS = {
     "pos": ("x > 0", lambda i, x: x > 0, "xi > 0", "Положительных чисел в файле нет"),
     "neg": ("x < 0", lambda i, x: x < 0, "xi < 0", "Отрицательных чисел в файле нет"),
-    "even": ("i % 2 == 0", lambda i, x: i % 2 == 0, "i ⋮ 2", "Чисел с чётными номерами в файле нет"),
-    "odd": ("i % 2 == 1", lambda i, x: i % 2 == 1, "i ⋮̸ 2", "Чисел с нечётными номерами в файле нет"),
+    "even": ("i % 2 == 0", lambda i, x: i % 2 == 0, "i mod 2 = 0", "Чисел с чётными номерами в файле нет"),
+    # первое число всегда имеет нечётный номер – результат существует при любом n ≥ 1
+    "odd": ("i % 2 == 1", lambda i, x: i % 2 == 1, "i mod 2 = 1", ""),
     "all": (None, lambda i, x: True, "", ""),
 }
 # величина: начальное значение r, C-обновление, псевдокод, формула для «Связи»
@@ -119,10 +120,10 @@ void output(int cnt){{
 }}
 '''
         else:
-            none = f'''        printf("\\n{self.none} - результат не существует.\\n");\n''' if self.f_c else ""
+            none = f'''        printf("\\n{self.none} - результат не существует.\\n");\n''' if self.none else ""
             out = f'''/* Вывод результата: cnt - сколько чисел участвовало в вычислении */
 void output(int cnt, double r){{
-''' + (f"    if (cnt == 0)\n{none}    else\n        printf(\"\\n{self.cap}: %g\\n\", r);\n" if self.f_c else
+''' + (f"    if (cnt == 0)\n{none}    else\n        printf(\"\\n{self.cap}: %g\\n\", r);\n" if self.none else
        f"    if (cnt > 0) printf(\"\\n{self.cap}: %g\\n\", r);\n") + "}\n"
         proc = f'''
 /* Чтение двоичного файла name и вычисление:
@@ -186,7 +187,7 @@ int process(const char *name, double *r){{
         if self.agg == "count":
             con.printf(f"\n{self.cap}: %d\n" % cnt)
         elif cnt == 0:
-            if self.f_c:
+            if self.none:
                 con.printf(f"\n{self.none} - результат не существует.\n")
         else:
             con.printf(f"\n{self.cap}: %g\n" % r)
@@ -209,7 +210,7 @@ int process(const char *name, double *r){{
         rep.para("Файл name после создания содержит числа x1, x2, …, xn в порядке ввода (тип double, двоичный "
                  "вид); при чтении i – номер числа в файле:", after=2)
         rep.fline("", m(self.relation()))
-        if self.f_c and self.agg != "count":
+        if self.none and self.agg != "count":
             rep.para("Результат не существует, если в файле нет чисел, удовлетворяющих условию.", after=4)
 
     def method(self):
@@ -238,7 +239,7 @@ int process(const char *name, double *r){{
     def spec(self):
         res = [("box", [f"{self.cap}: <<cnt>>"], False)] if self.agg == "count" else (
             [("label", "При cnt = 0"), ("box", [f"{self.none} - результат не существует."], True),
-             ("label", "Иначе"), ("box", [f"{self.cap}: <<r>>"], True)] if self.f_c else
+             ("label", "Иначе"), ("box", [f"{self.cap}: <<r>>"], True)] if self.none else
             [("box", [f"{self.cap}: <<r>>"], False)])
         return (spec_name("двоичного файла", "name",
                           [("Если файл не удалось создать", 'Ошибка! Не удалось создать файл "<<name>>".')])
@@ -248,13 +249,13 @@ int process(const char *name, double *r){{
 
     def pseudo(self):
         idx = self.filt in ("even", "odd")
-        cond = self.f_doc.replace("xi", "x").replace("i ⋮ 2", "i чётно").replace("i ⋮̸ 2", "i нечётно")
+        cond = self.f_doc.replace("xi", "x").replace("i mod 2 = 0", "i чётно").replace("i mod 2 = 1", "i нечётно")
         upd = self.upd_ps
         inner = (f"\t\t_если_ {cond} _то_\n" + (f"\t\t\t{upd}\n" if upd else "") + "\t\t\tcnt := cnt + 1\n\t\t_всё_\n"
                  if cond else (f"\t\t{upd}\n" if upd else "") + "\t\tcnt := cnt + 1\n")
         res = (f"\tвывод(«{self.cap}: », cnt)" if self.agg == "count" else
                f"\t_если_ cnt = 0 _то_\n\t\tвывод(«{self.none} - результат не существует.»)\n"
-               f"\t_иначе_\n\t\tвывод(«{self.cap}: », r)\n\t_всё_" if self.f_c else
+               f"\t_иначе_\n\t\tвывод(«{self.cap}: », r)\n\t_всё_" if self.none else
                f"\tвывод(«{self.cap}: », r)")
         return f"""
 _функция_ create_file(name)
@@ -324,7 +325,7 @@ _кон_
                    "вводимые с клавиатуры и записываемые в файл."],
             result=["файл name с числами x1, …, xn; числа, прочитанные из файла;",
                     f"{self.cap.lower() if self.agg != 'count' else 'количество положительных чисел cnt'}"
-                    + (" – или сообщение, что подходящих чисел нет." if self.f_c and self.agg != "count" else ".")],
+                    + (" – или сообщение, что подходящих чисел нет." if self.none and self.agg != "count" else ".")],
             when=[f"n ∈ N, n ≤ NMAX = {NMAX}; xi ∈ R, |xi| ≤ RMAX = {RMAX} (дробная часть – через точку);",
                   "имя файла – от 1 до FMAX = 60 символов; числа хранятся в файле в двоичном виде (тип double)."],
             svyaz=self.svyaz, method=self.method(), spec=self.spec(), pseudo=self.pseudo(), tests=self.tests(),
