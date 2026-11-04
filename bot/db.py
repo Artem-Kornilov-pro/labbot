@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS gens_user ON gens(user_id);
 
 
 class Quota:
-    def __init__(self, path, limit=2):
+    def __init__(self, path, limit=6):
         self.limit = limit
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         # одно соединение на процесс; вызовы приходят из потоков asyncio.to_thread, поэтому – под блокировкой

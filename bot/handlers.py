@@ -76,14 +76,27 @@ async def cmd_cancel(msg: Message, state: FSMContext):
     await msg.answer("Отменено. Чтобы начать заново – /new.", reply_markup=start_kb())
 
 
-LIMIT_MSG = "Лимит исчерпан: вы уже получили {limit} лабы. Больше сгенерировать нельзя."
+LIMIT_MSG = "Лимит исчерпан: вы уже получили {limit} {word}. Больше сгенерировать нельзя."
+
+
+def labs_word(n):
+    """«лабу / лабы / лаб» после числа n: «получили 1 лабу, 3 лабы, 6 лаб»."""
+    if n % 10 == 1 and n % 100 != 11:
+        return "лабу"
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return "лабы"
+    return "лаб"
+
+
+def limit_msg(limit):
+    return LIMIT_MSG.format(limit=limit, word=labs_word(limit))
 
 
 async def begin(msg: Message, state: FSMContext, user_id, quota: Quota, admins):
     """Начало анкеты – только если лимит лаб не исчерпан (чтобы не заполнять её зря)."""
     await state.clear()
     if user_id not in admins and await asyncio.to_thread(quota.left, user_id) == 0:
-        await msg.answer(LIMIT_MSG.format(limit=quota.limit))
+        await msg.answer(limit_msg(quota.limit))
         return
     await state.set_state(Form.lab)
     await msg.answer("Выберите лабораторную работу:", reply_markup=labs_kb())
@@ -226,7 +239,7 @@ async def cb_generate(cb: CallbackQuery, state: FSMContext, quota: Quota, admins
     rec = await asyncio.to_thread(quota.reserve, user.id, user.username, data, user.id in admins)
     if rec is None:
         await state.clear()
-        await cb.message.answer(LIMIT_MSG.format(limit=quota.limit))
+        await cb.message.answer(limit_msg(quota.limit))
         return
     wait = await cb.message.answer("⏳ Собираю программы и отчёт…")
     try:

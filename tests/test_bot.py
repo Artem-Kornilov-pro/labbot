@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from bot.handlers import norm_name, summary  # noqa: E402
+from bot.handlers import limit_msg, norm_name, summary  # noqa: E402
 from labgen.registry import LABS  # noqa: E402
 
 
@@ -13,6 +13,18 @@ def test_norm_name():
     assert norm_name("Ivanov Ivan") is None
     assert norm_name("Иванов") is None
     assert norm_name("Иванов Иван Иванович Младший") is None
+
+
+def test_limit_message():
+    assert "получили 6 лаб." in limit_msg(6)
+    assert "получили 2 лабы." in limit_msg(2)
+    assert "получили 1 лабу." in limit_msg(1)
+    assert "получили 11 лаб." in limit_msg(11)
+
+
+def test_default_limit_is_six(tmp_path):
+    from bot.db import Quota
+    assert Quota(tmp_path / "db.sqlite").limit == 6
 
 
 def test_summary_and_all_labs_generate():
