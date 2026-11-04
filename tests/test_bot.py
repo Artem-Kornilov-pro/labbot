@@ -22,7 +22,8 @@ def test_summary_and_all_labs_generate():
         text = summary(data)
         assert "Вариант: 15" in text and "<b>" in text
         files = lab.generate("Иванов Иван", "", "", 15)
-        assert len(files) == 3 and all(len(b) > 1000 for _, b in files)
+        assert len(files) == len(lab.PARTS) + 1 or len(files) == 2      # программы + отчёт (лаба 4 – одна программа)
+        assert files[-1][0].endswith(".docx") and all(len(b) > 1000 for _, b in files)
 
 
 def test_blocklist():
