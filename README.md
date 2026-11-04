@@ -50,7 +50,7 @@ labgen/labs/core/        общий каркас лаб 3–5: cio.py (ввод 
                          эмулятор консоли и файлов), task.py (описание задачи), report.py (сборка отчёта), omml.py
 labgen/labs/lab3/        лаба 3: part1/tNN.py — по файлу на задачу; part2.py, part3.py — задачи по таблице параметров
 tests/               проверки (нужен gcc и LibreOffice для части инструментов)
-tools/               show_tests.py — результаты тестов задачи; check_overflow.py — поиск текста за полями
+tools/               show_tests.py — результаты тестов задачи; check_overflow.py [лабы] — поиск текста за полями
 ```
 
 ## Проверки

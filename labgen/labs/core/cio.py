@@ -210,14 +210,21 @@ class TextFile:
 
 
 # ====================================================================== спецификация
+def shown(v):
+    """Как значение выглядит в окне спецификации: число – как есть, имя (NMAX, n) – <<NMAX>> (выводится его
+    значение)."""
+    v = str(v)
+    return v if v.lstrip("-").isdigit() else f"<<{v}>>"
+
+
 def spec_input_int(name, lo, hi, var=None):
     """name – как величина названа в приглашении («длину массива n»), var – её обозначение («n»)."""
     var = var or name
     return [
         ("rep_start",),
-        ("box", [f"Введите {name} (целое число от <<{lo}>> до <<{hi}>>): <{var}>"], False),
+        ("box", [f"Введите {name} (целое число от {shown(lo)} до {shown(hi)}): <{var}>"], False),
         ("label", f"При {var} ∉ Z или {var} < {lo} или {var} > {hi}"),
-        ("box", [f"Ошибка! Нужно ввести целое число от <<{lo}>> до <<{hi}>>."], True),
+        ("box", [f"Ошибка! Нужно ввести целое число от {shown(lo)} до {shown(hi)}."], True),
         ("rep_end", f"До {var} ∈ Z и {lo} ≤ {var} ≤ {hi}"),
     ]
 
@@ -228,8 +235,8 @@ def spec_input_reals(what, names, cnt, lo="-RMAX", hi="RMAX", extra=None):
         ("rep_start",),
         ("box", [f"Введите {what}: " + " ".join(f"<{n}>" for n in names)], False),
         ("label", "При ошибке ввода (не числа, не то количество, вне диапазона)"),
-        ("box", [f"Ошибка! Нужно чисел: <<{cnt}>>, каждое от <<{lo}>> до <<{hi}>> (дробная часть - через точку)."],
-         True),
+        ("box", [f"Ошибка! Нужно чисел: {shown(cnt)}, каждое от {shown(lo)} до {shown(hi)} (дробная часть - "
+                 "через точку)."], True),
     ]
     if extra:
         items += [("label", extra[0]), ("box", [extra[1]], True)]
