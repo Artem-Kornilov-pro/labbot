@@ -6,7 +6,7 @@
 from ..core.task import Task, Test
 from ..core.cio import TextFile
 from ..core.cstr import C_CHARS, C_EDIT, is_rus, is_lat, is_dig
-from .shared import NAME_DEFINES, NAME_FUNCS, py_input_name, can_create, spec_name
+from .shared import NAME_DEFINES, NAME_FUNCS, CRT, py_input_name, can_create, spec_name
 
 COUNT = 9
 INTRO = ("Создать текстовый файл средствами редактора (т.е. в «Блокноте»). Прочитать этот файл построчно и "
@@ -408,7 +408,7 @@ _кон_
                   "пропускаются с сообщением); out ≠ in; имена файлов – от 1 до FMAX = 60 символов;",
                   "текст в кодировке UTF-8 (русская буква – 2 байта), конец строки – '\\n' или '\\r\\n'."],
             svyaz=self.svyaz, method=self.method(), spec=self.spec(), pseudo=self.pseudo(), tests=self.tests(),
-            file="lab5_part2.c",
+            file="lab5_part2.c", prelude=CRT,
             note="В таблице тестов \\r – символ возврата каретки (конец строки Windows: \\r\\n). Файлы "
                  "создаются в текущей папке программы.",
         )

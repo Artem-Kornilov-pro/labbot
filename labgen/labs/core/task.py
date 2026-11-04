@@ -36,6 +36,7 @@ class Task:
     formulas: object = None     # fn(rep) – формулы условия в разделе «Задание» (лаба 3, часть I)
     file: str = ""              # имя файла программы
     lead: object = None         # текст условия в отчёте, если формулы условия выводятся formulas (иначе statement)
+    prelude: str = ""           # строки до #include (например, _CRT_SECURE_NO_WARNINGS для Visual Studio)
 
     @property
     def title(self):
@@ -46,7 +47,8 @@ class Task:
     def c_source(self, author, variant):
         inc = "".join(f"#include <{h}>\n" for h in self.includes)
         head = self.title.replace("№ ", "№")
-        return (f"/* {head}.\n   Вариант {variant}. Выполнил: {author} */\n"
+        pre = f"{self.prelude}\n" if self.prelude else ""
+        return (f"/* {head}.\n   Вариант {variant}. Выполнил: {author} */\n{pre}"
                 f"#include <stdio.h>\n{inc}{self.defines}\n\n{self.functions.strip(chr(10))}\n\n"
                 f"int main(){{\n{self.decls}\n"
                 f'    printf("{self.title}\\n"\n'

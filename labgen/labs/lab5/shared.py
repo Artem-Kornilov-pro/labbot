@@ -6,6 +6,8 @@
 from ..core.cio import C_READ_STR, py_read_str
 
 FMAX = 60
+# Visual Studio по умолчанию считает fopen, sprintf, strcpy ошибкой C4996 («небезопасные функции»)
+CRT = "#define _CRT_SECURE_NO_WARNINGS  /* Visual Studio: разрешить fopen, sprintf, strcpy */"
 
 C_INPUT_NAME = r'''/* Ввод имени файла (what - какого файла). Возвращает 0 при конце ввода. */
 int input_name(const char *what, char name[]){

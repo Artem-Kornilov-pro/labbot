@@ -6,7 +6,7 @@
 from ..core.task import Task, Test
 from ..core.cio import (C_READ_LINE, C_INPUT_INT, C_READ_REALS, C_INPUT_REALS, RMAX, py_input_int,
                         py_input_reals, spec_input_int, spec_input_reals)
-from .shared import NAME_DEFINES, NAME_FUNCS, py_input_name, can_create, spec_name
+from .shared import NAME_DEFINES, NAME_FUNCS, CRT, py_input_name, can_create, spec_name
 
 COUNT = 12
 INTRO = "Создать файл для хранения действительных чисел, вводимых с клавиатуры. Прочитать этот файл и вычислить: "
@@ -329,7 +329,7 @@ _кон_
             when=[f"n ∈ N, n ≤ NMAX = {NMAX}; xi ∈ R, |xi| ≤ RMAX = {RMAX} (дробная часть – через точку);",
                   "имя файла – от 1 до FMAX = 60 символов; числа хранятся в файле в двоичном виде (тип double)."],
             svyaz=self.svyaz, method=self.method(), spec=self.spec(), pseudo=self.pseudo(), tests=self.tests(),
-            file="lab5_part1.c",
+            file="lab5_part1.c", prelude=CRT,
             note="Числа выводятся в формате %g (до 6 значащих цифр). Файл создаётся в текущей папке программы.",
         )
 
