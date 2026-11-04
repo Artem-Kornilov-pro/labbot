@@ -26,6 +26,10 @@ def test_report_structure(variant):
     n1, n2 = lab2.tasks_for_variant(variant)
     assert f"задание {n1}" in xml and f"задание {n2}" in xml
     assert "Иванов Иван Иванович" in xml and "БИТ261" in xml
+    with zipfile.ZipFile(io.BytesIO(docx)) as z:
+        settings = z.read("word/settings.xml").decode()
+    # не «режим ограниченной функциональности» в Word
+    assert 'w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"' in settings
 
 
 def test_variants_cover_all_tasks():

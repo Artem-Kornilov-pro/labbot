@@ -710,6 +710,11 @@ class Report:
             z.set(qn("w:percent"), "100")
         # Word обновит оглавление при открытии (номера страниц станут точными)
         settings.append(X('<w:updateFields <NS> w:val="true"/>'))
+        # шаблон python-docx помечен как документ Word 2010 (compatibilityMode 14) – Word открывает его
+        # в «режиме ограниченной функциональности»; 15 – обычный документ Word 2013 и новее
+        for cs in settings.iter(qn("w:compatSetting")):
+            if cs.get(qn("w:name")) == "compatibilityMode":
+                cs.set(qn("w:val"), "15")
         self._schema_sort_settings(settings)
         self.doc.core_properties.author = self.t.author
         self.doc.core_properties.title = f"Отчёт по лабораторной работе №{self.t.lab_no}"
