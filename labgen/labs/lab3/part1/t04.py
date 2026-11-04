@@ -74,7 +74,8 @@ def formulas(rep):
 
 
 def svyaz(rep):
-    rep.fline("", formula() + m(",   P1(x1, y1),  P2(x2, y2),  P3(x3, y3)"))
+    rep.fline("", formula() + m(","))
+    rep.fline("где  ", m("P1(x1, y1),  P2(x2, y2),  P3(x3, y3) – вершины треугольника"), indent=0.6)
 
 
 METHOD = [

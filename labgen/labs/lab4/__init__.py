@@ -98,7 +98,6 @@ class Program:
 
     def body(self):
         l1, l2 = self.ex.label, self.fi.label
-        fail = self.tr.fail or "-"
         return f'''    if (!input_int("число строк k", 1, KMAX, &k)) return 1;
     for (i = 0; i < k; i++)
         if (!input_str(i + 1, s[i])) return 1;
@@ -128,13 +127,19 @@ class Program:
             i = ln[f];
 {c_printf(f'{chr(10)}Поиск ({l2}): "%.*s" (строка %d){chr(10)}', "len[f], p[f], i + 1", ind="            ")}
             printf("Исходная строка %d: \\"%s\\"\\n", i + 1, s[i]);
-            if (transform(s[i]))
-                printf("Преобразованная строка: \\"%s\\"\\n", s[i]);
-            else
-{c_printf(f"Преобразование невозможно: {fail}.{chr(10)}", ind="                ")}
+{self.c_transform()}
         }}
     }}
 '''
+
+    def c_transform(self):
+        if not self.tr.fail:          # преобразование выполнимо всегда
+            return ('            transform(s[i]);\n'
+                    '            printf("Преобразованная строка: \\"%s\\"\\n", s[i]);')
+        return ('            if (transform(s[i]))\n'
+                '                printf("Преобразованная строка: \\"%s\\"\\n", s[i]);\n'
+                '            else\n'
+                + c_printf(f"Преобразование невозможно: {self.tr.fail}.\n", ind="                "))
 
     # ------------------------------------------------------------------ Python
     def simulate(self, con):
@@ -260,15 +265,17 @@ _нач_
 			j := ln[f]
 			вывод(«Поиск: », p[f], «(строка », j, «)»)
 			вывод(«Исходная строка », j, «: », s[j])
-			_если_ transform(s[j]) = 1 _то_
-				вывод(«Преобразованная строка: », s[j])
-			_иначе_
-				вывод(«Преобразование невозможно.»)
-			_всё_
+{self.pseudo_transform()}
 		_всё_
 	_всё_
 _кон_
 """)
+
+    def pseudo_transform(self):
+        if not self.tr.fail:
+            return "\t\t\ttransform(s[j])\n\t\t\tвывод(«Преобразованная строка: », s[j])"
+        return ("\t\t\t_если_ transform(s[j]) = 1 _то_\n\t\t\t\tвывод(«Преобразованная строка: », s[j])\n"
+                f"\t\t\t_иначе_\n\t\t\t\tвывод(«Преобразование невозможно: {self.tr.fail}.»)\n\t\t\t_всё_")
 
     def tests(self):
         rich, poor, none = SAMPLES[self.a]
