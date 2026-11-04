@@ -57,7 +57,7 @@ labgen/labs/lab3/        лаба 3: part1/tNN.py — по файлу на за�
 labgen/labs/lab4/        лаба 4: pieces.py — подпрограммы трёх пунктов, __init__.py — сборка программы и тесты
                          (core/cstr.py — символы UTF-8, удаление/вставка сдвигом на C и Python)
 tests/               проверки (нужен gcc и LibreOffice для части инструментов)
-tools/               show_tests.py — результаты тестов задачи; check_overflow.py — поиск текста за полями
+tools/               show_tests.py — результаты тестов задачи; check_overflow.py [лабы] — поиск текста за полями
 ```
 
 ## Проверки
