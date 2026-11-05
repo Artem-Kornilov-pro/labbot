@@ -3,6 +3,7 @@ import asyncio
 import html
 import logging
 import re
+from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
@@ -10,7 +11,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from labgen.registry import LABS
+from .admins import Admins
 from .db import Quota
+from .stats import build_xlsx, summary as stats_summary
 from .keyboards import confirm_kb, labs_kb, skip_kb, start_kb
 from .states import Form
 
@@ -53,27 +56,42 @@ def summary(data):
 
 
 # ------------------------------------------------------------------ команды
-async def quota_line(user_id, quota: Quota, admins):
-    if user_id in admins:
-        return ""
-    return f"\n\nДоступно лаб: {await asyncio.to_thread(quota.left, user_id)} из {quota.limit}."
+async def quota_line(user, quota: Quota, admins: Admins):
+    if user in admins:
+        return "\n\nВы администратор: лимита нет. /stats – статистика бота (Excel)."
+    return f"\n\nДоступно лаб: {await asyncio.to_thread(quota.left, user.id)} из {quota.limit}."
 
 
 @router.message(CommandStart())
-async def cmd_start(msg: Message, state: FSMContext, quota: Quota, admins: set):
+async def cmd_start(msg: Message, state: FSMContext, quota: Quota, admins: Admins):
     await state.clear()
-    await msg.answer("Привет! " + HELP + await quota_line(msg.from_user.id, quota, admins), reply_markup=start_kb())
+    await msg.answer("Привет! " + HELP + await quota_line(msg.from_user, quota, admins), reply_markup=start_kb())
 
 
 @router.message(Command("help"))
-async def cmd_help(msg: Message, quota: Quota, admins: set):
-    await msg.answer(HELP + await quota_line(msg.from_user.id, quota, admins), reply_markup=start_kb())
+async def cmd_help(msg: Message, quota: Quota, admins: Admins):
+    await msg.answer(HELP + await quota_line(msg.from_user, quota, admins), reply_markup=start_kb())
 
 
 @router.message(Command("cancel"))
 async def cmd_cancel(msg: Message, state: FSMContext):
     await state.clear()
     await msg.answer("Отменено. Чтобы начать заново – /new.", reply_markup=start_kb())
+
+
+@router.message(Command("stats"))
+async def cmd_stats(msg: Message, quota: Quota, admins: Admins):
+    """Статистика бота (только для администраторов): Excel-таблица по всем выданным лабам."""
+    if msg.from_user not in admins:
+        await msg.answer("Команда доступна только администраторам.")
+        return
+    rows = await asyncio.to_thread(quota.rows)
+    data = await asyncio.to_thread(build_xlsx, rows, quota.limit)
+    s = stats_summary(rows, quota.limit)
+    name = f"labbot_stats_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    await msg.answer_document(BufferedInputFile(data, filename=name),
+                              caption=f"Выдано лаб: {s['total']} (сегодня {s['today']}), "
+                                      f"пользователей: {s['users']}, лимит: {s['limit']}.")
 
 
 LIMIT_MSG = "Лимит исчерпан: вы уже получили {limit} {word}. Больше сгенерировать нельзя."
@@ -92,10 +110,10 @@ def limit_msg(limit):
     return LIMIT_MSG.format(limit=limit, word=labs_word(limit))
 
 
-async def begin(msg: Message, state: FSMContext, user_id, quota: Quota, admins):
+async def begin(msg: Message, state: FSMContext, user, quota: Quota, admins: Admins):
     """Начало анкеты – только если лимит лаб не исчерпан (чтобы не заполнять её зря)."""
     await state.clear()
-    if user_id not in admins and await asyncio.to_thread(quota.left, user_id) == 0:
+    if user not in admins and await asyncio.to_thread(quota.left, user.id) == 0:
         await msg.answer(limit_msg(quota.limit))
         return
     await state.set_state(Form.lab)
@@ -103,13 +121,13 @@ async def begin(msg: Message, state: FSMContext, user_id, quota: Quota, admins):
 
 
 @router.message(Command("new"))
-async def cmd_new(msg: Message, state: FSMContext, quota: Quota, admins: set):
-    await begin(msg, state, msg.from_user.id, quota, admins)
+async def cmd_new(msg: Message, state: FSMContext, quota: Quota, admins: Admins):
+    await begin(msg, state, msg.from_user, quota, admins)
 
 
 @router.callback_query(F.data == "new")
-async def cb_new(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: set):
-    await begin(cb.message, state, cb.from_user.id, quota, admins)
+async def cb_new(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: Admins):
+    await begin(cb.message, state, cb.from_user, quota, admins)
     await cb.answer()
 
 
@@ -230,13 +248,13 @@ async def step_manual(msg: Message, state: FSMContext):
 
 # ------------------------------------------------------------------ генерация
 @router.callback_query(Form.confirm, F.data == "gen")
-async def cb_generate(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: set):
+async def cb_generate(cb: CallbackQuery, state: FSMContext, quota: Quota, admins: Admins):
     await state.set_state(Form.generating)      # повторное нажатие «Сгенерировать» сюда уже не попадёт
     data = await state.get_data()
     lab = lab_of(data)
     user = cb.from_user
     await cb.answer()
-    rec = await asyncio.to_thread(quota.reserve, user.id, user.username, data, user.id in admins)
+    rec = await asyncio.to_thread(quota.reserve, user.id, user.username, data, user in admins)
     if rec is None:
         await state.clear()
         await cb.message.answer(limit_msg(quota.limit))
@@ -260,7 +278,7 @@ async def cb_generate(cb: CallbackQuery, state: FSMContext, quota: Quota, admins
         "В Word при открытии отчёта согласитесь обновить поля – номера страниц в содержании станут точными.",
     )
     await state.clear()
-    if user.id in admins:
+    if user in admins:
         await cb.message.answer("Создать ещё одну лабу?", reply_markup=start_kb())
         return
     left = await asyncio.to_thread(quota.left, user.id)
