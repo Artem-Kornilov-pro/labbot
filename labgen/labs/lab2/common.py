@@ -101,8 +101,8 @@ def c_print_matrix(name, n, m, title):
 
 
 def c_print_array(name, k, title, fmt="%d "):
-    return f'''    printf("{title}");
-    for (i = 1; i <= {k}; i++)
+    head = f'    printf("{title}");\n' if title else ""     # без пустого printf("")
+    return f'''{head}    for (i = 1; i <= {k}; i++)
         printf("{fmt}", {name}[i]);
     printf("\\n");
 '''
