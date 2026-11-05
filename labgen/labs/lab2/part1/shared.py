@@ -63,8 +63,8 @@ def py_sort_row(M, i, m, desc=False):
 
 
 def c_print_list(title, arr, cnt):
-    return f'''        printf("{title}");
-        for (t = 1; t <= {cnt}; t++)
+    head = f'        printf("{title}");\n' if title else ""   # без пустого printf("")
+    return f'''{head}        for (t = 1; t <= {cnt}; t++)
             printf("%d ", {arr}[t]);
         printf("\\n");'''
 

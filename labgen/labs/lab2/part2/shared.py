@@ -4,8 +4,8 @@ from ..inputs import PositiveArray
 
 
 def c_print_arr(title, arr, cnt, ind="        "):
-    return f'''{ind}printf("{title}");
-{ind}for (i = 1; i <= {cnt}; i++)
+    head = f'{ind}printf("{title}");\n' if title else ""     # без пустого printf("")
+    return f'''{head}{ind}for (i = 1; i <= {cnt}; i++)
 {ind}    printf("%d ", {arr}[i]);
 {ind}printf("\\n");'''
 
