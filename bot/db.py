@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS gens_user ON gens(user_id);
 
 
 class Quota:
-    def __init__(self, path, limit=6):
+    def __init__(self, path, limit=10):
         self.limit = limit
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         # одно соединение на процесс; вызовы приходят из потоков asyncio.to_thread, поэтому – под блокировкой
@@ -54,6 +54,14 @@ class Quota:
                 "WHERE ? OR (SELECT COUNT(*) FROM gens WHERE user_id = ?) < ?",
                 row + (unlimited, user_id, self.limit))
             return cur.lastrowid if cur.rowcount else None
+
+    def rows(self):
+        """Все выданные лабы (для статистики): список словарей с полями таблицы gens."""
+        with self.lock:
+            cur = self.db.execute("SELECT id, user_id, username, name, grp, teacher, lab, variant, nums, created "
+                                  "FROM gens ORDER BY created")
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, r)) for r in cur.fetchall()]
 
     def release(self, rec_id):
         """Вернуть лабу в лимит, если генерация не удалась."""

@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
+from .admins import Admins
 from .blocklist import Blocklist
 from .db import Quota
 from .handlers import router
@@ -39,8 +40,8 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     # попадают в обработчики аргументами quota и admins
     dp["quota"] = Quota(os.environ.get("DB_PATH", ROOT / "data" / "labbot.db"),
-                        limit=int(os.environ.get("LAB_LIMIT", "6")))
-    dp["admins"] = {int(x) for x in os.environ.get("ADMIN_IDS", "").replace(",", " ").split()}
+                        limit=int(os.environ.get("LAB_LIMIT", "10")))
+    dp["admins"] = Admins.from_env()          # ADMIN_IDS и ADMIN_USERNAMES: без лимита, доступ к /stats
     blocked = os.environ.get("BLOCKED_USERNAMES", "").replace(",", " ").split()
     if blocked:
         bl = Blocklist(blocked, os.environ.get("BLOCK_MSG", "Доступ к боту закрыт."))
